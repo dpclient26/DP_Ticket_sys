@@ -348,7 +348,8 @@ document.addEventListener('click', function(e) {
             .then(response => response.json())
             .then(result => {
                 if (result.result === 'success') {
-                    allRecords = allRecords.filter(r => r['Reference Number/Ticket Number'] !== refNum);
+                    // FIX: Convert both to String to guarantee the filter works
+                    allRecords = allRecords.filter(r => String(r['Reference Number/Ticket Number']) !== String(refNum));
                     updateStats();
                     applyFiltersAndRender();
                 } else {
@@ -365,7 +366,6 @@ document.addEventListener('click', function(e) {
         }
     }
 });
-
 // ==========================================
 // 7. Download Sheet (CSV) Functionality
 // ==========================================
@@ -418,33 +418,30 @@ function setupDownloadButton() {
             return;
         }
 
-        const headers = Object.keys(allRecords[0]);
+        // 1. Get headers but EXCLUDE the Timestamp column
+        const allHeaders = Object.keys(allRecords[0]);
+        const headers = allHeaders.filter(h => h !== 'Timestamp'); 
+
+        // 2. Build CSV rows
         const csvRows = [];
-        
-        // Add headers row
         csvRows.push(headers.map(header => `"${header}"`).join(','));
 
         // Add data rows
         allRecords.forEach(record => {
             const values = headers.map(header => {
                 let val = record[header] || '';
-                
-                // Format dates before adding to CSV
                 val = formatValueForCSV(header, val);
-
-                // Escape double quotes inside the value
                 val = String(val).replace(/"/g, '""');
-                // Wrap in double quotes to handle commas inside text
                 return `"${val}"`;
             });
             csvRows.push(values.join(','));
         });
 
-        // Create CSV Blob
+        // 3. Create CSV Blob
         const csvString = '\uFEFF' + csvRows.join('\n');
         const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
         
-        // Trigger Download
+        // 4. Trigger Download
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         
