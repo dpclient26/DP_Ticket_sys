@@ -462,4 +462,3 @@ function setupDownloadButton() {
         URL.revokeObjectURL(url);
     });
 }
-}
