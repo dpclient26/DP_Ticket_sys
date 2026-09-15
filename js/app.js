@@ -1,7 +1,7 @@
 // ==========================================
 // 1. Google Sheets Integration Setup
 // ==========================================
-const scriptURL = 'https://script.google.com/macros/s/AKfycbz6xRJNKuTGjBKhDrifjTyf3AXaiTMcYxSBMe1BzdruNvW-0a8lNNVRtjvR0M9KJFew/exec'; // PASTE YOUR /exec URL HERE
+const scriptURL = 'https://script.google.com/macros/s/AKfycbz6xRJNKuTGjBKhDrifjTyf3AXaiTMcYxSBMe1BzdruNvW-0a8lNNVRtjvR0M9KJFew/exec'; // google code
 
 // Global State
 let allRecords = [];
@@ -27,13 +27,9 @@ document.addEventListener('DOMContentLoaded', () => {
 // Helper: Format any date string to YYYY-MM-DD for HTML date inputs
 function formatDateForInput(dateStr) {
     if (!dateStr) return '';
-    // If it's already YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.split('T')[0];
-    
-    // Try to parse other formats
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return '';
-    
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
@@ -74,24 +70,20 @@ function updateStats() {
 // 3. Filtering, Searching, and Table Rendering
 // ==========================================
 function applyFiltersAndRender() {
-    // 1. Apply Status Filter
     if (currentFilter === 'all') {
         filteredRecords = [...allRecords];
     } else {
         filteredRecords = allRecords.filter(r => r['Status'] === currentFilter);
     }
 
-    // 2. Apply Universal Search Filter (Searches EVERY column for the text)
     if (searchQuery) {
         const query = searchQuery.toLowerCase();
         filteredRecords = filteredRecords.filter(r => {
-            // Combine all values of the row into one string and search it
             const rowString = Object.values(r).join(' ').toLowerCase();
             return rowString.includes(query);
         });
     }
 
-    // Reset to page 1 if filters change
     if (currentPage > Math.ceil(filteredRecords.length / recordsPerPage)) {
         currentPage = 1;
     }
@@ -125,12 +117,11 @@ function renderTable() {
         const problem = row['Problem Statement / Objective'] || 'N/A';
         const shortProblem = problem.length > 30 ? problem.substring(0, 30) + '...' : problem;
         
-        // Use Reference Number as the unique ID
         const rawId = row['Reference Number/Ticket Number'] || '';
         const displayId = rawId ? rawId : 'N/A';
 
         const editAction = rawId 
-            ? `<a href="form.html?edit=${encodeURIComponent(rawId)}" class="text-primary fw-semibold text-decoration-none me-3 action-btn">Edit</a>` 
+            ? `<a href="form.html?edit=${encodeURIComponent(rawId)}" class="text-primary fw-semibold text-decoration-none me-3 action-btn">View/Edit</a>` 
             : `<a href="#" class="text-muted fw-semibold text-decoration-none me-3" onclick="alert('Cannot edit: Missing Reference Number.'); return false;">Edit</a>`;
         
         const deleteAction = rawId 
@@ -237,12 +228,17 @@ function setupFormLogic(form) {
     const urlParams = new URLSearchParams(window.location.search);
     const editId = urlParams.get('edit');
     const submitBtn = document.getElementById('submitBtn');
+    const refNumberInput = document.getElementById('refNumberInput');
 
     if (editId && editId !== 'undefined' && editId !== 'N/A') {
+        // --- EDIT MODE ---
         document.getElementById('formTitle').innerText = 'Edit Data Request';
         document.getElementById('formSubtitle').innerText = 'Update the fields below to modify the request in the registry.';
         submitBtn.innerHTML = '<i class="bi bi-save me-2"></i> Update Request';
         
+        // Display the existing ID in the readonly field
+        refNumberInput.value = editId;
+
         const hiddenInput = document.createElement('input');
         hiddenInput.type = 'hidden';
         hiddenInput.name = 'originalId';
@@ -252,28 +248,15 @@ function setupFormLogic(form) {
         fetch(scriptURL + "?action=get")
             .then(res => res.json())
             .then(data => {
-                // Find the exact record
                 const record = data.find(r => r['Reference Number/Ticket Number'] == editId);
                 
                 if (record) {
-                    console.log("Found record to edit:", record); // Debugging
-                    
-                    // Explicitly map the fields to guarantee they populate
                     const fieldsToFill = [
-                        'Reference Number/Ticket Number',
-                        'Requested Department',
-                        'Request Date',
-                        'Letter / Email Reference',
-                        'Action Taken By',
-                        'Problem Statement / Objective',
-                        'Datasets Used',
-                        'Date for Data Dump',
-                        'Received Count',
-                        'Result Shared Mode',
-                        'Analysis Outcome',
-                        'File Path (if any)',
-                        'Action Taken',
-                        'Status'
+                        'Requested Department', 'Request Date', 'Letter / Email Reference',
+                        'Action Taken By', 'Problem Statement / Objective', 'Datasets Used',
+                        'Date for Data Dump', 'Received Count', 'Completed Date',
+                        'Result Shared Mode', 'Analysis Outcome', 'File Path (if any)',
+                        'Action Taken', 'Status'
                     ];
 
                     fieldsToFill.forEach(field => {
@@ -293,9 +276,14 @@ function setupFormLogic(form) {
             })
             .catch(err => {
                 console.error("Error fetching record for edit:", err);
-                alert("Failed to load record details. Check console.");
+                alert("Failed to load record details.");
             });
-    } 
+    } else {
+        // --- ADD MODE ---
+        // Explicitly set the placeholder text so the user knows it will be auto-filled
+        refNumberInput.value = "";
+        refNumberInput.placeholder = "Auto-generated on save";
+    }
 
     form.addEventListener('submit', e => {
         e.preventDefault();
@@ -312,7 +300,11 @@ function setupFormLogic(form) {
         .then(response => response.json())
         .then(result => {
             if (result.result === 'success') {
-                alert(`Request ${actionType === 'add' ? 'submitted' : 'updated'} successfully!`);
+                // If it was a new add, show the generated ID in the alert
+                const msg = actionType === 'add' 
+                    ? `Request submitted successfully! Generated ID: ${result.id}` 
+                    : `Request updated successfully!`;
+                alert(msg);
                 window.location.href = 'index.html'; 
             } else {
                 alert('Error: ' + result.error);
@@ -325,7 +317,13 @@ function setupFormLogic(form) {
         });
     });
 
-    document.getElementById('clearBtn')?.addEventListener('click', () => form.reset());
+    document.getElementById('clearBtn')?.addEventListener('click', () => {
+        form.reset();
+        // Preserve the edit ID if we are in edit mode
+        if (editId && editId !== 'undefined' && editId !== 'N/A') {
+            refNumberInput.value = editId;
+        }
+    });
 }
 
 // ==========================================
