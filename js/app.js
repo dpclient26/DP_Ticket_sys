@@ -452,7 +452,7 @@ function setupDownloadButton() {
         const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         
         link.setAttribute('href', url);
-        link.setAttribute('download', `Operations_Data_${dateString}.csv`);
+        link.setAttribute('download', `Data_Purity_Requests_${dateString}.csv`);
         link.style.visibility = 'hidden';
         
         document.body.appendChild(link);
