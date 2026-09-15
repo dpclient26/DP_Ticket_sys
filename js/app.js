@@ -369,6 +369,45 @@ document.addEventListener('click', function(e) {
 // ==========================================
 // 7. Download Sheet (CSV) Functionality
 // ==========================================
+
+// Helper function to format dates for CSV export
+function formatValueForCSV(key, value) {
+    if (value === null || value === undefined) return '';
+    let strValue = String(value);
+
+    // Check if it's an ISO date string (e.g., 2026-09-15T11:43:47.000Z)
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(strValue)) {
+        const d = new Date(strValue);
+        if (isNaN(d.getTime())) return strValue; // Return raw if invalid
+
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+
+        // If it's the Timestamp column, include the time
+        if (key === 'Timestamp') {
+            let hours = d.getHours();
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            const seconds = String(d.getSeconds()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // the hour '0' should be '12'
+            return `${day}-${month}-${year} ${String(hours).padStart(2, '0')}:${minutes}:${seconds} ${ampm}`;
+        }
+        
+        // For normal Date fields (Request Date, Completed Date, etc.), just return DD-MM-YYYY
+        return `${day}-${month}-${year}`;
+    }
+    
+    // Handle plain YYYY-MM-DD strings
+    if (/^\d{4}-\d{2}-\d{2}$/.test(strValue)) {
+        const parts = strValue.split('-');
+        return `${parts[2]}-${parts[1]}-${parts[0]}`; // Convert to DD-MM-YYYY
+    }
+
+    return strValue;
+}
+
 function setupDownloadButton() {
     const downloadBtn = document.getElementById('downloadBtn');
     if (!downloadBtn) return;
@@ -382,20 +421,30 @@ function setupDownloadButton() {
         const headers = Object.keys(allRecords[0]);
         const csvRows = [];
         
+        // Add headers row
         csvRows.push(headers.map(header => `"${header}"`).join(','));
 
+        // Add data rows
         allRecords.forEach(record => {
             const values = headers.map(header => {
                 let val = record[header] || '';
+                
+                // Format dates before adding to CSV
+                val = formatValueForCSV(header, val);
+
+                // Escape double quotes inside the value
                 val = String(val).replace(/"/g, '""');
+                // Wrap in double quotes to handle commas inside text
                 return `"${val}"`;
             });
             csvRows.push(values.join(','));
         });
 
+        // Create CSV Blob
         const csvString = '\uFEFF' + csvRows.join('\n');
         const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
         
+        // Trigger Download
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         
@@ -403,7 +452,7 @@ function setupDownloadButton() {
         const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         
         link.setAttribute('href', url);
-        link.setAttribute('download', `Data_Purity_Requests_${dateString}.csv`);
+        link.setAttribute('download', `Operations_Data_${dateString}.csv`);
         link.style.visibility = 'hidden';
         
         document.body.appendChild(link);
@@ -412,4 +461,5 @@ function setupDownloadButton() {
         
         URL.revokeObjectURL(url);
     });
+}
 }
