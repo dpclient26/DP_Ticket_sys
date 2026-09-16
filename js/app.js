@@ -1,7 +1,7 @@
 // ==========================================
 // 1. Google Sheets Integration Setup
 // ==========================================
-const scriptURL = 'https://script.google.com/macros/s/AKfycbz6xRJNKuTGjBKhDrifjTyf3AXaiTMcYxSBMe1BzdruNvW-0a8lNNVRtjvR0M9KJFew/exec'; // google code
+const scriptURL = '/api/proxy';
 
 // Global State
 let allRecords = [];
