@@ -1,9 +1,5 @@
-// ==========================================
-// 1. Google Sheets Integration Setup
-// ==========================================
 const scriptURL = '/api/proxy';
 
-// Global State
 let allRecords = [];
 let filteredRecords = [];
 let currentPage = 1;
@@ -24,7 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (form) setupFormLogic(form);
 });
 
-// Helper: Format any date string to YYYY-MM-DD for HTML date inputs
 function formatDateForInput(dateStr) {
     if (!dateStr) return '';
     if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.split('T')[0];
@@ -36,9 +31,7 @@ function formatDateForInput(dateStr) {
     return `${year}-${month}-${day}`;
 }
 
-// ==========================================
-// 2. Fetch Data & Update Dashboard Stats
-// ==========================================
+
 function fetchAndRenderRecords() {
     const tableBody = document.getElementById('tableBody');
     tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><br>Loading records...</td></tr>`;
@@ -66,9 +59,7 @@ function updateStats() {
     document.getElementById('activeCount').innerText = active;
 }
 
-// ==========================================
-// 3. Filtering, Searching, and Table Rendering
-// ==========================================
+
 function applyFiltersAndRender() {
     if (currentFilter === 'all') {
         filteredRecords = [...allRecords];
@@ -146,9 +137,7 @@ function renderTable() {
     });
 }
 
-// ==========================================
-// 4. UI Controls (Filters, Search, Pagination)
-// ==========================================
+
 function setupFilters() {
     const filterGroup = document.getElementById('filterGroup');
     if (!filterGroup) return;
@@ -221,9 +210,7 @@ function renderPagination() {
     });
 }
 
-// ==========================================
-// 5. Form Logic (Handles both Add and Edit)
-// ==========================================
+
 function setupFormLogic(form) {
     const urlParams = new URLSearchParams(window.location.search);
     const editId = urlParams.get('edit');
@@ -279,8 +266,7 @@ function setupFormLogic(form) {
                 alert("Failed to load record details.");
             });
     } else {
-        // --- ADD MODE ---
-        // Explicitly set the placeholder text so the user knows it will be auto-filled
+        
         refNumberInput.value = "";
         refNumberInput.placeholder = "Auto-generated on save";
     }
@@ -300,7 +286,7 @@ function setupFormLogic(form) {
         .then(response => response.json())
         .then(result => {
             if (result.result === 'success') {
-                // If it was a new add, show the generated ID in the alert
+                
                 const msg = actionType === 'add' 
                     ? `Request submitted successfully! Generated ID: ${result.id}` 
                     : `Request updated successfully!`;
@@ -319,16 +305,14 @@ function setupFormLogic(form) {
 
     document.getElementById('clearBtn')?.addEventListener('click', () => {
         form.reset();
-        // Preserve the edit ID if we are in edit mode
+    
         if (editId && editId !== 'undefined' && editId !== 'N/A') {
             refNumberInput.value = editId;
         }
     });
 }
 
-// ==========================================
-// 6. Delete Functionality
-// ==========================================
+
 document.addEventListener('click', function(e) {
     if (e.target.classList.contains('delete-btn')) {
         e.preventDefault();
@@ -348,7 +332,7 @@ document.addEventListener('click', function(e) {
             .then(response => response.json())
             .then(result => {
                 if (result.result === 'success') {
-                    // FIX: Convert both to String to guarantee the filter works
+                
                     allRecords = allRecords.filter(r => String(r['Reference Number/Ticket Number']) !== String(refNum));
                     updateStats();
                     applyFiltersAndRender();
@@ -366,25 +350,21 @@ document.addEventListener('click', function(e) {
         }
     }
 });
-// ==========================================
-// 7. Download Sheet (CSV) Functionality
-// ==========================================
 
-// Helper function to format dates for CSV export
 function formatValueForCSV(key, value) {
     if (value === null || value === undefined) return '';
     let strValue = String(value);
 
-    // Check if it's an ISO date string (e.g., 2026-09-15T11:43:47.000Z)
+  
     if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(strValue)) {
         const d = new Date(strValue);
-        if (isNaN(d.getTime())) return strValue; // Return raw if invalid
+        if (isNaN(d.getTime())) return strValue; 
 
         const day = String(d.getDate()).padStart(2, '0');
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const year = d.getFullYear();
 
-        // If it's the Timestamp column, include the time
+        
         if (key === 'Timestamp') {
             let hours = d.getHours();
             const minutes = String(d.getMinutes()).padStart(2, '0');
@@ -395,14 +375,14 @@ function formatValueForCSV(key, value) {
             return `${day}-${month}-${year} ${String(hours).padStart(2, '0')}:${minutes}:${seconds} ${ampm}`;
         }
         
-        // For normal Date fields (Request Date, Completed Date, etc.), just return DD-MM-YYYY
+        
         return `${day}-${month}-${year}`;
     }
     
-    // Handle plain YYYY-MM-DD strings
+    
     if (/^\d{4}-\d{2}-\d{2}$/.test(strValue)) {
         const parts = strValue.split('-');
-        return `${parts[2]}-${parts[1]}-${parts[0]}`; // Convert to DD-MM-YYYY
+        return `${parts[2]}-${parts[1]}-${parts[0]}`; 
     }
 
     return strValue;
@@ -418,15 +398,15 @@ function setupDownloadButton() {
             return;
         }
 
-        // 1. Get headers but EXCLUDE the Timestamp column
+       
         const allHeaders = Object.keys(allRecords[0]);
         const headers = allHeaders.filter(h => h !== 'Timestamp'); 
 
-        // 2. Build CSV rows
+        
         const csvRows = [];
         csvRows.push(headers.map(header => `"${header}"`).join(','));
 
-        // Add data rows
+        
         allRecords.forEach(record => {
             const values = headers.map(header => {
                 let val = record[header] || '';
@@ -437,11 +417,11 @@ function setupDownloadButton() {
             csvRows.push(values.join(','));
         });
 
-        // 3. Create CSV Blob
+       
         const csvString = '\uFEFF' + csvRows.join('\n');
         const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
         
-        // 4. Trigger Download
+        
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         
