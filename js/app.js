@@ -124,7 +124,7 @@ function renderTable() {
         }
 
         const editAction = rawId 
-            ? `<a href="/form?edit=${encodeURIComponent(rawId)}" class="text-primary fw-semibold text-decoration-none me-3 action-btn">View/Edit</a>` 
+            ? `<a href="/index?edit=${encodeURIComponent(rawId)}" class="text-primary fw-semibold text-decoration-none me-3 action-btn">View/Edit</a>` 
             : `<a href="#" class="text-muted fw-semibold text-decoration-none me-3" onclick="alert('Cannot edit: Missing Reference Number.'); return false;">View/Edit</a>`;
         
         const deleteAction = rawId 
