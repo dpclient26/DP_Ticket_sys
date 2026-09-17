@@ -34,7 +34,7 @@ function formatDateForInput(dateStr) {
 
 function fetchAndRenderRecords() {
     const tableBody = document.getElementById('tableBody');
-    tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><br>Loading records...</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="9" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><br>Loading records...</td></tr>`;
 
     fetch(scriptURL + "?action=get")
         .then(response => response.json())
