@@ -88,7 +88,8 @@ function renderTable() {
     tableBody.innerHTML = '';
 
     if (filteredRecords.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted">No records found matching your criteria.</td></tr>`;
+        // Updated colspan from 8 to 9
+        tableBody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-muted">No records found matching your criteria.</td></tr>`;
         return;
     }
 
@@ -111,8 +112,19 @@ function renderTable() {
         const rawId = row['Reference Number/Ticket Number'] || '';
         const displayId = rawId ? rawId : 'N/A';
 
+        // --- GENERATE STATUS BADGE ---
+        const status = row['Status'] || 'Pending';
+        let statusBadge = '';
+        if (status === 'Completed') {
+            statusBadge = `<span class="badge bg-success-subtle text-success border border-success px-2 py-1">Completed</span>`;
+        } else if (status === 'In Progress') {
+            statusBadge = `<span class="badge bg-primary-subtle text-primary border border-primary px-2 py-1">In Progress</span>`;
+        } else {
+            statusBadge = `<span class="badge bg-warning-subtle text-warning border border-warning px-2 py-1">Pending</span>`;
+        }
+
         const editAction = rawId 
-            ? `<a href="index.html?edit=${encodeURIComponent(rawId)}" class="text-primary fw-semibold text-decoration-none me-3 action-btn">View/Edit</a>` 
+            ? `<a href="/form?edit=${encodeURIComponent(rawId)}" class="text-primary fw-semibold text-decoration-none me-3 action-btn">Edit</a>` 
             : `<a href="#" class="text-muted fw-semibold text-decoration-none me-3" onclick="alert('Cannot edit: Missing Reference Number.'); return false;">Edit</a>`;
         
         const deleteAction = rawId 
@@ -131,6 +143,8 @@ function renderTable() {
             <td><span class="badge bg-light text-dark border me-2">${initials}</span> ${actionBy}</td>
             <td class="text-truncate" style="max-width: 200px;" title="${problem}">${shortProblem}</td>
             <td class="text-muted">${row['Datasets Used'] || '-'}</td>
+            <!-- NEW STATUS COLUMN -->
+            <td>${statusBadge}</td>
             <td class="text-end px-4">${editAction}${deleteAction}</td>
         `;
         tableBody.appendChild(tr);
