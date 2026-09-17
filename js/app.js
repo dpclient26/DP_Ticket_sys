@@ -45,7 +45,7 @@ function fetchAndRenderRecords() {
         })
         .catch(error => {
             console.error('Error fetching data:', error);
-            tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-danger">Error loading records. Check console.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-danger">Error loading records. Check console.</td></tr>`;
         });
 }
 
