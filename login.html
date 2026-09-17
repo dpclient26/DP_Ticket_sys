@@ -95,7 +95,7 @@
                 if (data.success) {
                     // Store token in localStorage to keep user logged in
                     localStorage.setItem('ops_portal_token', data.token);
-                    window.location.href = 'index.html';
+                    window.location.href = '/index';
                 } else {
                     throw new Error(data.error || 'Login failed');
                 }
