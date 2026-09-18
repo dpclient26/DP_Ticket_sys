@@ -130,7 +130,7 @@ function renderTable() {
             : `<a href="#" class="text-muted fw-semibold text-decoration-none me-3" onclick="alert('Cannot edit: Missing Reference Number.'); return false;">View/Edit</a>`;
         
         const deleteAction = rawId 
-            ? `<a href="#" class="text-danger fw-semibold text-decoration-none action-btn delete-btn" data-id="${rawId}">Delete</a>` 
+            ? `<a href="#" class="text-danger fw-semibold text-decoration-none action-btn delete-btn disabled" data-id="${rawId}">Delete</a>` 
             : `<a href="#" class="text-muted fw-semibold text-decoration-none" onclick="alert('Cannot delete: Missing Reference Number.'); return false;">Delete</a>`;
 
         const tr = document.createElement('tr');
