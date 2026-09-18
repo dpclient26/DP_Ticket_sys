@@ -129,9 +129,9 @@ function renderTable() {
             ? `<a href="/index?edit=${encodeURIComponent(rawId)}" class="text-primary fw-semibold text-decoration-none me-3 action-btn">View/Edit</a>` 
             : `<a href="#" class="text-muted fw-semibold text-decoration-none me-3" onclick="alert('Cannot edit: Missing Reference Number.'); return false;">View/Edit</a>`;
         
-        const deleteAction = rawId 
-            ? `<a href="#" class="text-danger fw-semibold text-decoration-none action-btn delete-btn" data-id="${rawId}">Delete</a>` 
-            : `<a href="#" class="text-muted fw-semibold text-decoration-none" onclick="alert('Cannot delete: Missing Reference Number.'); return false;">Delete</a>`;
+        // const deleteAction = rawId 
+        //     ? `<a href="#" class="text-danger fw-semibold text-decoration-none action-btn delete-btn" data-id="${rawId}">Delete</a>` 
+        //     : `<a href="#" class="text-muted fw-semibold text-decoration-none" onclick="alert('Cannot delete: Missing Reference Number.'); return false;">Delete</a>`;
 
         const tr = document.createElement('tr');
         tr.className = 'animate-row';
@@ -147,7 +147,7 @@ function renderTable() {
             <td class="text-muted">${row['Datasets Used'] || '-'}</td>
             <!-- NEW STATUS COLUMN -->
             <td>${statusBadge}</td>
-            <td class="text-end px-4">${editAction}${deleteAction}</td>
+            <td class="text-end px-4">${editAction}</td>
         `;
         tableBody.appendChild(tr);
     });
@@ -329,43 +329,43 @@ function setupFormLogic(form) {
 }
 
 
-document.addEventListener('click', function(e) {
-    if (e.target.classList.contains('delete-btn')) {
-        e.preventDefault();
-        const btn = e.target;
-        const refNum = btn.getAttribute('data-id');
+// document.addEventListener('click', function(e) {
+//     if (e.target.classList.contains('delete-btn')) {
+//         e.preventDefault();
+//         const btn = e.target;
+//         const refNum = btn.getAttribute('data-id');
         
-        if (confirm(`Are you sure you want to delete record ${refNum}?`)) {
-            const deleteData = new URLSearchParams();
-            deleteData.append('action', 'delete');
-            deleteData.append('Reference Number/Ticket Number', refNum);
+//         if (confirm(`Are you sure you want to delete record ${refNum}?`)) {
+//             const deleteData = new URLSearchParams();
+//             deleteData.append('action', 'delete');
+//             deleteData.append('Reference Number/Ticket Number', refNum);
 
-            const originalText = btn.innerHTML;
-            btn.innerHTML = 'Deleting...';
-            btn.style.pointerEvents = 'none';
+//             const originalText = btn.innerHTML;
+//             btn.innerHTML = 'Deleting...';
+//             btn.style.pointerEvents = 'none';
 
-            fetch(scriptURL, { method: 'POST', body: deleteData })
-            .then(response => response.json())
-            .then(result => {
-                if (result.result === 'success') {
+//             fetch(scriptURL, { method: 'POST', body: deleteData })
+//             .then(response => response.json())
+//             .then(result => {
+//                 if (result.result === 'success') {
                 
-                    allRecords = allRecords.filter(r => String(r['Reference Number/Ticket Number']) !== String(refNum));
-                    updateStats();
-                    applyFiltersAndRender();
-                } else {
-                    alert('Error deleting record: ' + result.error);
-                    btn.innerHTML = originalText;
-                    btn.style.pointerEvents = 'auto';
-                }
-            })
-            .catch(error => {
-                alert('Error connecting to Google Sheets.');
-                btn.innerHTML = originalText;
-                btn.style.pointerEvents = 'auto';
-            });
-        }
-    }
-});
+//                     allRecords = allRecords.filter(r => String(r['Reference Number/Ticket Number']) !== String(refNum));
+//                     updateStats();
+//                     applyFiltersAndRender();
+//                 } else {
+//                     alert('Error deleting record: ' + result.error);
+//                     btn.innerHTML = originalText;
+//                     btn.style.pointerEvents = 'auto';
+//                 }
+//             })
+//             .catch(error => {
+//                 alert('Error connecting to Google Sheets.');
+//                 btn.innerHTML = originalText;
+//                 btn.style.pointerEvents = 'auto';
+//             });
+//         }
+//     }
+// });
 
 function formatValueForCSV(key, value) {
     if (value === null || value === undefined) return '';
