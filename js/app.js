@@ -122,7 +122,7 @@ function renderTable() {
         } else if (status === 'In Progress') {
             statusBadge = `<span class="badge bg-primary-subtle text-primary border border-primary px-2 py-1">In Progress</span>`;
         } else {
-             statusBadge = `<span class="badge bg-warning-subtle text-warning border border-warning px-2 py-1">Pending</span>`;
+             statusBadge = `<span class="badge bg-warning-subtle text-danger border border-danger px-2 py-1">Pending</span>`;
         }
 
         const editAction = rawId 
