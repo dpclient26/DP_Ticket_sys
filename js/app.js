@@ -45,7 +45,7 @@ function fetchAndRenderRecords() {
         })
         .catch(error => {
             console.error('Error fetching data:', error);
-            tableBody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-danger">Error loading records. Kindly Refresh.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-danger"> Kindly Refresh. Try Again.</td></tr>`;
         });
 }
 
@@ -144,7 +144,7 @@ function renderTable() {
             <td class="text-muted">${row['Letter / Email Reference'] || '-'}</td>
             <td><span class="badge bg-light text-dark border me-2">${initials}</span> ${actionBy}</td>
             <td class="text-truncate" style="max-width: 200px;" title="${problem}">${shortProblem}</td>
-            <td class="text-muted">${row['Datasets Used'] || '-'}</td>
+            <td class="text-muted">${row['Result Shared Mode'] || '-'}</td>
             <!-- NEW STATUS COLUMN -->
             <td>${statusBadge}</td>
             <td class="text-end px-4">${editAction}</td>
