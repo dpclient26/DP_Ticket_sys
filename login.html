@@ -47,7 +47,16 @@
         </form>
     </div>
 
-    <script>
+    <script> 
+        // Check if the user was logged out due to inactivity
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('timeout') === 'true') {
+        const errorAlert = document.getElementById('errorAlert');
+        errorAlert.classList.remove('alert-danger');
+        errorAlert.classList.add('alert-warning');
+        errorAlert.innerHTML = '<i class="bi bi-clock-history me-2"></i><strong>Session Expired:</strong> You were automatically logged out due to 5 minutes of inactivity.';
+        errorAlert.classList.remove('d-none');
+    }
         // 1. Generate Math CAPTCHA
         let correctAnswer = 0;
         function generateCaptcha() {
