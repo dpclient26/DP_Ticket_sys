@@ -1,5 +1,9 @@
+// ==========================================
+// 1. Google Sheets Integration Setup
+// ==========================================
 const scriptURL = '/api/proxy';
 
+// Global State
 let allRecords = [];
 let filteredRecords = [];
 let currentPage = 1;
@@ -7,10 +11,14 @@ const recordsPerPage = 5;
 let currentFilter = 'all';
 let searchQuery = '';
 
+// Cache Settings
+const CACHE_KEY = 'ops_portal_records_cache';
+const CACHE_TTL = 60 * 1000; // 60 seconds
+
 document.addEventListener('DOMContentLoaded', () => {
     const tableBody = document.getElementById('tableBody');
     if (tableBody) {
-        fetchAndRenderRecords();
+        loadFromCacheOrFetch(); // <-- New smart loader
         setupFilters();
         setupSearch();
         setupDownloadButton();
@@ -18,35 +26,103 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const form = document.getElementById('requestForm');
     if (form) setupFormLogic(form);
+
+    // Display the logged-in user's name
+    const user = sessionStorage.getItem('ops_portal_user');
+    if (user && document.getElementById('currentUserDisplay')) {
+        document.getElementById('currentUserDisplay').innerText = user;
+    }
 });
 
-function formatDateForInput(dateStr) {
-    if (!dateStr) return '';
-    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.split('T')[0];
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return '';
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+// ==========================================
+// CACHE HELPERS
+// ==========================================
+function saveToCache(data) {
+    try {
+        const payload = { data: data, timestamp: Date.now() };
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+    } catch (e) {
+        console.warn("Cache save failed (probably quota):", e);
+    }
 }
 
+function getFromCache() {
+    try {
+        const raw = sessionStorage.getItem(CACHE_KEY);
+        if (!raw) return null;
+        const payload = JSON.parse(raw);
+        if (Date.now() - payload.timestamp > CACHE_TTL) return null; // Expired
+        return payload.data;
+    } catch (e) {
+        return null;
+    }
+}
 
-function fetchAndRenderRecords() {
+function clearCache() {
+    sessionStorage.removeItem(CACHE_KEY);
+}
+
+// ==========================================
+// SMART FETCH WITH RETRY
+// ==========================================
+async function fetchWithRetry(url, options = {}, retries = 3, delay = 500) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            const response = await fetch(url, options);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return await response.json();
+        } catch (error) {
+            if (attempt === retries) throw error;
+            await new Promise(r => setTimeout(r, delay * attempt)); // Exponential backoff
+        }
+    }
+}
+
+// ==========================================
+// 2. Load Data (Stale-While-Revalidate)
+// ==========================================
+async function loadFromCacheOrFetch() {
     const tableBody = document.getElementById('tableBody');
-    tableBody.innerHTML = `<tr><td colspan="9" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><br>Loading records...</td></tr>`;
+    const cached = getFromCache();
 
-    fetch(scriptURL + "?action=get")
-        .then(response => response.json())
-        .then(data => {
-            allRecords = data.reverse(); 
-            updateStats();
-            applyFiltersAndRender();
-        })
-        .catch(error => {
-            console.error('Error fetching data:', error);
-            tableBody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-danger"> Kindly Refresh. Try Again.</td></tr>`;
-        });
+    // STEP 1: If we have cache, show it INSTANTLY
+    if (cached && cached.length >= 0) {
+        allRecords = [...cached].reverse();
+        updateStats();
+        applyFiltersAndRender();
+        // Quietly refresh in background
+        fetchAndRenderRecords(true);
+    } else {
+        // No cache - show loading and fetch
+        tableBody.innerHTML = `<tr><td colspan="9" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><br>Loading records...</td></tr>`;
+        fetchAndRenderRecords(false);
+    }
+}
+
+async function fetchAndRenderRecords(isBackgroundRefresh = false) {
+    try {
+        const data = await fetchWithRetry(scriptURL + "?action=get", {}, 3, 500);
+        
+        // Save fresh data to cache
+        saveToCache(data);
+        
+        // Update UI with fresh data
+        allRecords = [...data].reverse();
+        updateStats();
+        applyFiltersAndRender();
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        // Only show error if we have nothing to display
+        if (!isBackgroundRefresh || allRecords.length === 0) {
+            document.getElementById('tableBody').innerHTML = 
+                `<tr><td colspan="9" class="text-center py-4 text-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Unable to load records. Please check your connection and try again.
+                    <br><button class="btn btn-sm btn-outline-primary mt-2" onclick="loadFromCacheOrFetch()">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Retry
+                    </button>
+                </td></tr>`;
+        }
+    }
 }
 
 function updateStats() {
@@ -61,7 +137,9 @@ function updateStats() {
     document.getElementById('pendingCount').innerText = pending;
 }
 
-
+// ==========================================
+// 3. Filtering, Searching, and Table Rendering
+// ==========================================
 function applyFiltersAndRender() {
     if (currentFilter === 'all') {
         filteredRecords = [...allRecords];
@@ -90,7 +168,6 @@ function renderTable() {
     tableBody.innerHTML = '';
 
     if (filteredRecords.length === 0) {
-        // Updated colspan from 8 to 9
         tableBody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-muted">No records found matching your criteria.</td></tr>`;
         return;
     }
@@ -114,7 +191,6 @@ function renderTable() {
         const rawId = row['Reference Number/Ticket Number'] || '';
         const displayId = rawId ? rawId : 'N/A';
 
-        // --- GENERATE STATUS BADGE ---
         const status = row['Status'] || 'Pending';
         let statusBadge = '';
         if (status === 'Completed') {
@@ -122,20 +198,16 @@ function renderTable() {
         } else if (status === 'In Progress') {
             statusBadge = `<span class="badge bg-primary-subtle text-primary border border-primary px-2 py-1">In Progress</span>`;
         } else {
-             statusBadge = `<span class="badge bg-warning-subtle text-danger border border-danger px-2 py-1">Pending</span>`;
+            statusBadge = `<span class="badge bg-danger-subtle text-danger border border-danger px-2 py-1">Pending</span>`;
         }
 
         const editAction = rawId 
-            ? `<a href="/index?edit=${encodeURIComponent(rawId)}" class="text-primary fw-semibold text-decoration-none me-3 action-btn">View/Edit</a>` 
-            : `<a href="#" class="text-muted fw-semibold text-decoration-none me-3" onclick="alert('Cannot edit: Missing Reference Number.'); return false;">View/Edit</a>`;
-        
-        // const deleteAction = rawId 
-        //     ? `<a href="#" class="text-danger fw-semibold text-decoration-none action-btn delete-btn" data-id="${rawId}">Delete</a>` 
-        //     : `<a href="#" class="text-muted fw-semibold text-decoration-none" onclick="alert('Cannot delete: Missing Reference Number.'); return false;">Delete</a>`;
+            ? `<a href="/form?edit=${encodeURIComponent(rawId)}" class="text-primary fw-semibold text-decoration-none action-btn">Edit</a>` 
+            : `<a href="#" class="text-muted fw-semibold text-decoration-none" onclick="alert('Cannot edit: Missing Reference Number.'); return false;">Edit</a>`;
 
         const tr = document.createElement('tr');
         tr.className = 'animate-row';
-        tr.style.animationDelay = `${index * 0.1}s`;
+        tr.style.animationDelay = `${Math.min(index * 0.05, 0.4)}s`;
 
         tr.innerHTML = `
             <td class="px-4 ${rawId ? 'text-primary' : 'text-muted'} fw-semibold">${displayId}</td>
@@ -144,8 +216,7 @@ function renderTable() {
             <td class="text-muted">${row['Letter / Email Reference'] || '-'}</td>
             <td><span class="badge bg-light text-dark border me-2">${initials}</span> ${actionBy}</td>
             <td class="text-truncate" style="max-width: 200px;" title="${problem}">${shortProblem}</td>
-            <td class="text-muted">${row['Result Shared Mode'] || '-'}</td>
-            <!-- NEW STATUS COLUMN -->
+            <td class="text-muted">${row['Datasets Used'] || '-'}</td>
             <td>${statusBadge}</td>
             <td class="text-end px-4">${editAction}</td>
         `;
@@ -153,7 +224,9 @@ function renderTable() {
     });
 }
 
-
+// ==========================================
+// 4. UI Controls (Filters, Search, Pagination)
+// ==========================================
 function setupFilters() {
     const filterGroup = document.getElementById('filterGroup');
     if (!filterGroup) return;
@@ -226,7 +299,9 @@ function renderPagination() {
     });
 }
 
-
+// ==========================================
+// 5. Form Logic (Handles both Add and Edit)
+// ==========================================
 function setupFormLogic(form) {
     const urlParams = new URLSearchParams(window.location.search);
     const editId = urlParams.get('edit');
@@ -234,12 +309,10 @@ function setupFormLogic(form) {
     const refNumberInput = document.getElementById('refNumberInput');
 
     if (editId && editId !== 'undefined' && editId !== 'N/A') {
-        // --- EDIT MODE ---
         document.getElementById('formTitle').innerText = 'Edit Data Request';
         document.getElementById('formSubtitle').innerText = 'Update the fields below to modify the request in the registry.';
         submitBtn.innerHTML = '<i class="bi bi-save me-2"></i> Update Request';
         
-        // Display the existing ID in the readonly field
         refNumberInput.value = editId;
 
         const hiddenInput = document.createElement('input');
@@ -248,41 +321,21 @@ function setupFormLogic(form) {
         hiddenInput.value = editId;
         form.appendChild(hiddenInput);
 
-        fetch(scriptURL + "?action=get")
-            .then(res => res.json())
+        // Use cache first for instant form population
+        const cached = getFromCache();
+        if (cached) {
+            const record = cached.find(r => r['Reference Number/Ticket Number'] == editId);
+            if (record) populateForm(form, record);
+        }
+
+        // Then fetch fresh
+        fetchWithRetry(scriptURL + "?action=get")
             .then(data => {
                 const record = data.find(r => r['Reference Number/Ticket Number'] == editId);
-                
-                if (record) {
-                    const fieldsToFill = [
-                        'Requested Department', 'Request Date', 'Letter / Email Reference',
-                        'Action Taken By', 'Problem Statement / Objective', 'Datasets Used',
-                        'Date for Data Dump', 'Received Count', 'Completed Date',
-                        'Result Shared Mode', 'Analysis Outcome', 'File Path (if any)',
-                        'Action Taken', 'Status'
-                    ];
-
-                    fieldsToFill.forEach(field => {
-                        const input = form.elements[field];
-                        if (input && record[field] !== undefined && record[field] !== null) {
-                            if (input.type === 'date') {
-                                input.value = formatDateForInput(record[field]);
-                            } else {
-                                input.value = record[field];
-                            }
-                        }
-                    });
-                } else {
-                    alert("Record not found in database!");
-                    window.location.href = 'index.html';
-                }
+                if (record) populateForm(form, record);
             })
-            .catch(err => {
-                console.error("Error fetching record for edit:", err);
-                alert("Failed to load record details.");
-            });
+            .catch(err => console.error("Error fetching record:", err));
     } else {
-        
         refNumberInput.value = "";
         refNumberInput.placeholder = "Auto-generated on save";
     }
@@ -297,22 +350,23 @@ function setupFormLogic(form) {
         const urlEncodedData = new URLSearchParams(formData);
         const actionType = urlEncodedData.has('originalId') ? 'update' : 'add';
         urlEncodedData.append('action', actionType);
+        urlEncodedData.append('Logged In User', sessionStorage.getItem('ops_portal_user') || 'Unknown');
 
         fetch(scriptURL, { method: 'POST', body: urlEncodedData })
         .then(response => response.json())
         .then(result => {
             if (result.result === 'success') {
-                
+                clearCache(); // ⚡ Invalidate cache so next page shows fresh data
                 const msg = actionType === 'add' 
                     ? `Request submitted successfully! Generated ID: ${result.id}` 
                     : `Request updated successfully!`;
                 alert(msg);
-                window.location.href = 'index.html'; 
+                window.location.href = '/index'; 
             } else {
                 alert('Error: ' + result.error);
             }
         })
-        .catch(error => alert('Network error. Kindly Refresh.'))
+        .catch(error => alert('Network error. Check console.'))
         .finally(() => {
             submitBtn.innerHTML = originalBtnText;
             submitBtn.disabled = false;
@@ -321,86 +375,75 @@ function setupFormLogic(form) {
 
     document.getElementById('clearBtn')?.addEventListener('click', () => {
         form.reset();
-    
         if (editId && editId !== 'undefined' && editId !== 'N/A') {
             refNumberInput.value = editId;
         }
     });
 }
 
+function populateForm(form, record) {
+    const fieldsToFill = [
+        'Requested Department', 'Request Date', 'Letter / Email Reference',
+        'Action Taken By', 'Problem Statement / Objective', 'Datasets Used',
+        'Date for Data Dump', 'Received Count', 'Completed Date',
+        'Result Shared Mode', 'Analysis Outcome', 'File Path (if any)',
+        'Action Taken', 'Status'
+    ];
 
-// document.addEventListener('click', function(e) {
-//     if (e.target.classList.contains('delete-btn')) {
-//         e.preventDefault();
-//         const btn = e.target;
-//         const refNum = btn.getAttribute('data-id');
-        
-//         if (confirm(`Are you sure you want to delete record ${refNum}?`)) {
-//             const deleteData = new URLSearchParams();
-//             deleteData.append('action', 'delete');
-//             deleteData.append('Reference Number/Ticket Number', refNum);
+    fieldsToFill.forEach(field => {
+        const input = form.elements[field];
+        if (input && record[field] !== undefined && record[field] !== null) {
+            if (input.type === 'date') {
+                input.value = formatDateForInput(record[field]);
+            } else {
+                input.value = record[field];
+            }
+        }
+    });
+}
 
-//             const originalText = btn.innerHTML;
-//             btn.innerHTML = 'Deleting...';
-//             btn.style.pointerEvents = 'none';
+// Helper: Format any date string to YYYY-MM-DD for HTML date inputs
+function formatDateForInput(dateStr) {
+    if (!dateStr) return '';
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.split('T')[0];
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
 
-//             fetch(scriptURL, { method: 'POST', body: deleteData })
-//             .then(response => response.json())
-//             .then(result => {
-//                 if (result.result === 'success') {
-                
-//                     allRecords = allRecords.filter(r => String(r['Reference Number/Ticket Number']) !== String(refNum));
-//                     updateStats();
-//                     applyFiltersAndRender();
-//                 } else {
-//                     alert('Error deleting record: ' + result.error);
-//                     btn.innerHTML = originalText;
-//                     btn.style.pointerEvents = 'auto';
-//                 }
-//             })
-//             .catch(error => {
-//                 alert('Error connecting to Google Sheets.');
-//                 btn.innerHTML = originalText;
-//                 btn.style.pointerEvents = 'auto';
-//             });
-//         }
-//     }
-// });
-
+// ==========================================
+// 6. Download Sheet (CSV) Functionality
+// ==========================================
 function formatValueForCSV(key, value) {
     if (value === null || value === undefined) return '';
     let strValue = String(value);
 
-  
     if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(strValue)) {
         const d = new Date(strValue);
-        if (isNaN(d.getTime())) return strValue; 
+        if (isNaN(d.getTime())) return strValue;
 
         const day = String(d.getDate()).padStart(2, '0');
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const year = d.getFullYear();
 
-        
         if (key === 'Timestamp') {
             let hours = d.getHours();
             const minutes = String(d.getMinutes()).padStart(2, '0');
             const seconds = String(d.getSeconds()).padStart(2, '0');
             const ampm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12;
-            hours = hours ? hours : 12; // the hour '0' should be '12'
+            hours = hours % 12 || 12;
             return `${day}-${month}-${year} ${String(hours).padStart(2, '0')}:${minutes}:${seconds} ${ampm}`;
         }
-        
-        
         return `${day}-${month}-${year}`;
     }
     
-    
     if (/^\d{4}-\d{2}-\d{2}$/.test(strValue)) {
         const parts = strValue.split('-');
-        return `${parts[2]}-${parts[1]}-${parts[0]}`; 
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
-
     return strValue;
 }
 
@@ -414,15 +457,12 @@ function setupDownloadButton() {
             return;
         }
 
-       
         const allHeaders = Object.keys(allRecords[0]);
         const headers = allHeaders.filter(h => h !== 'Timestamp'); 
 
-        
         const csvRows = [];
         csvRows.push(headers.map(header => `"${header}"`).join(','));
 
-        
         allRecords.forEach(record => {
             const values = headers.map(header => {
                 let val = record[header] || '';
@@ -433,10 +473,8 @@ function setupDownloadButton() {
             csvRows.push(values.join(','));
         });
 
-       
         const csvString = '\uFEFF' + csvRows.join('\n');
         const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-        
         
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -445,7 +483,7 @@ function setupDownloadButton() {
         const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         
         link.setAttribute('href', url);
-        link.setAttribute('download', `Data_Purity_Requests_${dateString}.csv`);
+        link.setAttribute('download', `Operations_Data_${dateString}.csv`);
         link.style.visibility = 'hidden';
         
         document.body.appendChild(link);
