@@ -7,7 +7,7 @@ const scriptURL = '/api/proxy';
 let allRecords = [];
 let filteredRecords = [];
 let currentPage = 1;
-const recordsPerPage = 5;
+const recordsPerPage = 10;
 let currentFilter = 'all';
 let searchQuery = '';
 
