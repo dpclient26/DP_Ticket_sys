@@ -403,14 +403,31 @@ function populateForm(form, record) {
 }
 
 // Helper: Format any date string to YYYY-MM-DD for HTML date inputs
+// CRITICAL: This function must NEVER shift dates by timezone!
 function formatDateForInput(dateStr) {
     if (!dateStr) return '';
-    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.split('T')[0];
-    const d = new Date(dateStr);
+    
+    const str = String(dateStr).trim();
+
+    // 1. Already in YYYY-MM-DD format (e.g., "2026-09-10")
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        return str; // Return as-is. No timezone conversion.
+    }
+
+    // 2. Format YYYY-MM-DDTHH:mm:ss (ISO). Just extract the date portion.
+    //    Example: "2026-09-10T18:30:00.000Z" -> "2026-09-10"
+    if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
+        return str.split('T')[0]; // Take only the date part
+    }
+
+    // 3. Fallback: Try to parse. This should only be for weird formats.
+    const d = new Date(str);
     if (isNaN(d.getTime())) return '';
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    
+    // Use UTC methods to avoid any local timezone shifts
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 }
 
