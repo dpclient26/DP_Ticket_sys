@@ -317,7 +317,7 @@ function setupFormLogic(form) {
     const submitBtn = document.getElementById('submitBtn');
     const refNumberInput = document.getElementById('refNumberInput');
     const overlay = document.getElementById('formLoadingOverlay');
-    // const cancelBtn = document.getElementById('cancelLoadBtn');
+    const cancelBtn = document.getElementById('cancelLoadBtn');
 
     if (editId && editId !== 'undefined' && editId !== 'N/A') {
         document.getElementById('formTitle').innerText = 'Edit Data Request';
@@ -338,11 +338,11 @@ function setupFormLogic(form) {
         // After 4 seconds, show the "Cancel" button in case of slow network
         const cancelTimer = setTimeout(() => {
             cancelBtn.classList.remove('d-none');
-        }, 4000);
+        }, 10000);
 
         // Cancel button action
         cancelBtn.addEventListener('click', () => {
-            window.location.href = '/index';
+            window.location.href = '/form';
         });
 
         // Helper: Hide overlay and populate form
