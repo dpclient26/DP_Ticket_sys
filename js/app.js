@@ -317,7 +317,7 @@ function setupFormLogic(form) {
     const submitBtn = document.getElementById('submitBtn');
     const refNumberInput = document.getElementById('refNumberInput');
     const overlay = document.getElementById('formLoadingOverlay');
-    const cancelBtn = document.getElementById('cancelLoadBtn');
+    // const cancelBtn = document.getElementById('cancelLoadBtn');
 
     if (editId && editId !== 'undefined' && editId !== 'N/A') {
         document.getElementById('formTitle').innerText = 'Edit Data Request';
