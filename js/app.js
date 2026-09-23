@@ -168,7 +168,8 @@ function renderTable() {
     tableBody.innerHTML = '';
 
     if (filteredRecords.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-muted">No records found matching your criteria.</td></tr>`;
+        // Changed colspan from 9 to 10
+        tableBody.innerHTML = `<tr><td colspan="10" class="text-center py-4 text-muted">No records found matching your criteria.</td></tr>`;
         return;
     }
 
@@ -190,6 +191,12 @@ function renderTable() {
         
         const rawId = row['Reference Number/Ticket Number'] || '';
         const displayId = rawId ? rawId : 'N/A';
+
+        // ✨ NEW: Format the Received Count with commas (e.g., 25000 -> 25,000)
+        const receivedCount = row['Received Count'] || '-';
+        const formattedCount = (receivedCount !== '-' && !isNaN(receivedCount)) 
+            ? Number(receivedCount).toLocaleString() 
+            : receivedCount;
 
         const status = row['Status'] || 'Pending';
         let statusBadge = '';
@@ -216,7 +223,9 @@ function renderTable() {
             <td class="text-muted">${row['Letter / Email Reference'] || '-'}</td>
             <td><span class="badge bg-light text-dark border me-2">${initials}</span> ${actionBy}</td>
             <td class="text-truncate" style="max-width: 200px;" title="${problem}">${shortProblem}</td>
-            <td class="text-muted">${row['Result Shared Mode'] || '-'}</td>
+            <td class="text-muted">${row['Datasets Used'] || '-'}</td>
+            <!-- ✨ NEW COLUMN -->
+            <td class="fw-semibold text-dark">${formattedCount}</td>
             <td>${statusBadge}</td>
             <td class="text-end px-4">${editAction}</td>
         `;
