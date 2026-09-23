@@ -366,7 +366,7 @@ function setupFormLogic(form) {
                 alert('Error: ' + result.error);
             }
         })
-        .catch(error => alert('Network error. Check console.'))
+        .catch(error => alert('Network error. Check Your Connection.'))
         .finally(() => {
             submitBtn.innerHTML = originalBtnText;
             submitBtn.disabled = false;
