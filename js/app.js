@@ -460,31 +460,26 @@ function populateForm(form, record) {
 }
 
 // Helper: Format any date string to YYYY-MM-DD for HTML date inputs
-// CRITICAL: This function must NEVER shift dates by timezone!
+// Uses LOCAL time to correctly handle IST (UTC+5:30) and other timezones
 function formatDateForInput(dateStr) {
     if (!dateStr) return '';
     
     const str = String(dateStr).trim();
 
-    // 1. Already in YYYY-MM-DD format (e.g., "2026-09-10")
+    // 1. Already a plain date like "2026-09-10" -> return as-is
     if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-        return str; // Return as-is. No timezone conversion.
+        return str;
     }
 
-    // 2. Format YYYY-MM-DDTHH:mm:ss (ISO). Just extract the date portion.
-    //    Example: "2026-09-10T18:30:00.000Z" -> "2026-09-10"
-    if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
-        return str.split('T')[0]; // Take only the date part
-    }
-
-    // 3. Fallback: Try to parse. This should only be for weird formats.
+    // 2. ISO format with timezone like "2026-09-09T18:30:00.000Z"
+    //    Convert through Date object and use LOCAL time methods
+    //    (This is the fix for the "one day earlier" bug)
     const d = new Date(str);
     if (isNaN(d.getTime())) return '';
     
-    // Use UTC methods to avoid any local timezone shifts
-    const year = d.getUTCFullYear();
-    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(d.getUTCDate()).padStart(2, '0');
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 }
 
