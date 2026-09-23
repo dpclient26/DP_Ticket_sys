@@ -223,7 +223,7 @@ function renderTable() {
             <td class="text-muted">${row['Letter / Email Reference'] || '-'}</td>
             <td><span class="badge bg-light text-dark border me-2">${initials}</span> ${actionBy}</td>
             <td class="text-truncate" style="max-width: 200px;" title="${problem}">${shortProblem}</td>
-            <td class="text-muted">${row['Datasets Used'] || '-'}</td>
+            <td class="text-muted">${row['Result Shared Mode'] || '-'}</td>
             <!-- ✨ NEW COLUMN -->
             <td class="fw-semibold text-dark">${formattedCount}</td>
             <td>${statusBadge}</td>
