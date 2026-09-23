@@ -307,6 +307,8 @@ function setupFormLogic(form) {
     const editId = urlParams.get('edit');
     const submitBtn = document.getElementById('submitBtn');
     const refNumberInput = document.getElementById('refNumberInput');
+    const overlay = document.getElementById('formLoadingOverlay');
+    const cancelBtn = document.getElementById('cancelLoadBtn');
 
     if (editId && editId !== 'undefined' && editId !== 'N/A') {
         document.getElementById('formTitle').innerText = 'Edit Data Request';
@@ -321,20 +323,66 @@ function setupFormLogic(form) {
         hiddenInput.value = editId;
         form.appendChild(hiddenInput);
 
-        // Use cache first for instant form population
+        // ✨ SHOW THE LOADING OVERLAY
+        overlay.classList.remove('d-none');
+
+        // After 4 seconds, show the "Cancel" button in case of slow network
+        const cancelTimer = setTimeout(() => {
+            cancelBtn.classList.remove('d-none');
+        }, 4000);
+
+        // Cancel button action
+        cancelBtn.addEventListener('click', () => {
+            window.location.href = '/index';
+        });
+
+        // Helper: Hide overlay and populate form
+        const finishLoading = (record) => {
+            if (record) populateForm(form, record);
+            clearTimeout(cancelTimer);
+            // Smooth fade out
+            overlay.style.transition = 'opacity 0.3s ease';
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.classList.add('d-none');
+                overlay.style.opacity = '1'; // Reset for next time
+            }, 300);
+        };
+
+        // STRATEGY 1: Check sessionStorage cache first (INSTANT!)
         const cached = getFromCache();
         if (cached) {
-            const record = cached.find(r => r['Reference Number/Ticket Number'] == editId);
-            if (record) populateForm(form, record);
+            const record = cached.find(r => String(r['Reference Number/Ticket Number']) === String(editId));
+            if (record) {
+                // Keep overlay up for at least 300ms for a smooth experience
+                setTimeout(() => finishLoading(record), 300);
+            }
         }
 
-        // Then fetch fresh
-        fetchWithRetry(scriptURL + "?action=get")
+        // STRATEGY 2: Also fetch fresh data (in case cache is stale)
+        fetchWithRetry(scriptURL + "?action=get", {}, 3, 500)
             .then(data => {
-                const record = data.find(r => r['Reference Number/Ticket Number'] == editId);
-                if (record) populateForm(form, record);
+                const record = data.find(r => String(r['Reference Number/Ticket Number']) === String(editId));
+                if (record) {
+                    // Save to cache for next time
+                    saveToCache(data);
+                    // Only finish if not already finished (cache may have hit first)
+                    if (!overlay.classList.contains('d-none')) {
+                        finishLoading(record);
+                    }
+                } else {
+                    alert("Record not found in database!");
+                    window.location.href = '/index';
+                }
             })
-            .catch(err => console.error("Error fetching record:", err));
+            .catch(err => {
+                console.error("Error fetching record for edit:", err);
+                // If we already loaded from cache, don't show an error
+                if (!overlay.classList.contains('d-none')) {
+                    alert("Failed to load record. Please try again.");
+                    window.location.href = '/index';
+                }
+            });
     } else {
         refNumberInput.value = "";
         refNumberInput.placeholder = "Auto-generated on save";
@@ -356,7 +404,7 @@ function setupFormLogic(form) {
         .then(response => response.json())
         .then(result => {
             if (result.result === 'success') {
-                clearCache(); // ⚡ Invalidate cache so next page shows fresh data
+                clearCache(); // Invalidate cache so fresh data loads on index
                 const msg = actionType === 'add' 
                     ? `Request submitted successfully! Generated ID: ${result.id}` 
                     : `Request updated successfully!`;
@@ -366,7 +414,7 @@ function setupFormLogic(form) {
                 alert('Error: ' + result.error);
             }
         })
-        .catch(error => alert('Network error. Check Your Connection.'))
+        .catch(error => alert('Network error. Check console.'))
         .finally(() => {
             submitBtn.innerHTML = originalBtnText;
             submitBtn.disabled = false;
