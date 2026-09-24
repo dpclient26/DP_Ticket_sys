@@ -401,7 +401,7 @@ function setupFormLogic(form) {
         e.preventDefault();
         const originalBtnText = submitBtn.innerHTML;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Saving...';
-        submitBtn.disabled = false;
+        // submitBtn.disabled = true;
 
         const formData = new FormData(form);
         const urlEncodedData = new URLSearchParams(formData);
