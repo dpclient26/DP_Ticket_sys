@@ -168,8 +168,7 @@ function renderTable() {
     tableBody.innerHTML = '';
 
     if (filteredRecords.length === 0) {
-        // Changed colspan from 9 to 10
-        tableBody.innerHTML = `<tr><td colspan="10" class="text-center py-4 text-muted">No records found matching your criteria.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-muted">No records found matching your criteria.</td></tr>`;
         return;
     }
 
@@ -191,12 +190,6 @@ function renderTable() {
         
         const rawId = row['Reference Number/Ticket Number'] || '';
         const displayId = rawId ? rawId : 'N/A';
-
-        // ✨ NEW: Format the Received Count with commas (e.g., 25000 -> 25,000)
-        const receivedCount = row['Received Count'] || '-';
-        const formattedCount = (receivedCount !== '-' && !isNaN(receivedCount)) 
-            ? Number(receivedCount).toLocaleString() 
-            : receivedCount;
 
         const status = row['Status'] || 'Pending';
         let statusBadge = '';
@@ -223,8 +216,6 @@ function renderTable() {
             <td class="text-muted">${row['Letter / Email Reference'] || '-'}</td>
             <td><span class="badge bg-light text-dark border me-2">${initials}</span> ${actionBy}</td>
             <td class="text-truncate" style="max-width: 200px;" title="${problem}">${shortProblem}</td>
-            <!-- ✨ NEW COLUMN -->
-            <td class="text-muted">${formattedCount}</td> 
             <td class="text-muted">${row['Result Shared Mode'] || '-'}</td>
             <td>${statusBadge}</td>
             <td class="text-end px-4">${editAction}</td>
@@ -316,8 +307,6 @@ function setupFormLogic(form) {
     const editId = urlParams.get('edit');
     const submitBtn = document.getElementById('submitBtn');
     const refNumberInput = document.getElementById('refNumberInput');
-    const overlay = document.getElementById('formLoadingOverlay');
-    const cancelBtn = document.getElementById('cancelLoadBtn');
 
     if (editId && editId !== 'undefined' && editId !== 'N/A') {
         document.getElementById('formTitle').innerText = 'Edit Data Request';
@@ -332,66 +321,20 @@ function setupFormLogic(form) {
         hiddenInput.value = editId;
         form.appendChild(hiddenInput);
 
-        // ✨ SHOW THE LOADING OVERLAY
-        overlay.classList.remove('d-none');
-
-        // After 4 seconds, show the "Cancel" button in case of slow network
-        const cancelTimer = setTimeout(() => {
-            cancelBtn.classList.remove('d-none');
-        }, 10000);
-
-        // Cancel button action
-        cancelBtn.addEventListener('click', () => {
-            window.location.href = '/form';
-        });
-
-        // Helper: Hide overlay and populate form
-        const finishLoading = (record) => {
-            if (record) populateForm(form, record);
-            clearTimeout(cancelTimer);
-            // Smooth fade out
-            overlay.style.transition = 'opacity 0.3s ease';
-            overlay.style.opacity = '0';
-            setTimeout(() => {
-                overlay.classList.add('d-none');
-                overlay.style.opacity = '1'; // Reset for next time
-            }, 300);
-        };
-
-        // STRATEGY 1: Check sessionStorage cache first (INSTANT!)
+        // Use cache first for instant form population
         const cached = getFromCache();
         if (cached) {
-            const record = cached.find(r => String(r['Reference Number/Ticket Number']) === String(editId));
-            if (record) {
-                // Keep overlay up for at least 300ms for a smooth experience
-                setTimeout(() => finishLoading(record), 300);
-            }
+            const record = cached.find(r => r['Reference Number/Ticket Number'] == editId);
+            if (record) populateForm(form, record);
         }
 
-        // STRATEGY 2: Also fetch fresh data (in case cache is stale)
-        fetchWithRetry(scriptURL + "?action=get", {}, 3, 500)
+        // Then fetch fresh
+        fetchWithRetry(scriptURL + "?action=get")
             .then(data => {
-                const record = data.find(r => String(r['Reference Number/Ticket Number']) === String(editId));
-                if (record) {
-                    // Save to cache for next time
-                    saveToCache(data);
-                    // Only finish if not already finished (cache may have hit first)
-                    if (!overlay.classList.contains('d-none')) {
-                        finishLoading(record);
-                    }
-                } else {
-                    alert("Record not found in database!");
-                    window.location.href = '/index';
-                }
+                const record = data.find(r => r['Reference Number/Ticket Number'] == editId);
+                if (record) populateForm(form, record);
             })
-            .catch(err => {
-                console.error("Error fetching record for edit:", err);
-                // If we already loaded from cache, don't show an error
-                if (!overlay.classList.contains('d-none')) {
-                    alert("Failed to load record. Please try again.");
-                    window.location.href = '/index';
-                }
-            });
+            .catch(err => console.error("Error fetching record:", err));
     } else {
         refNumberInput.value = "";
         refNumberInput.placeholder = "Auto-generated on save";
@@ -413,7 +356,7 @@ function setupFormLogic(form) {
         .then(response => response.json())
         .then(result => {
             if (result.result === 'success') {
-                clearCache(); // Invalidate cache so fresh data loads on index
+                clearCache(); // ⚡ Invalidate cache so next page shows fresh data
                 const msg = actionType === 'add' 
                     ? `Request submitted successfully! Generated ID: ${result.id}` 
                     : `Request updated successfully!`;
@@ -423,7 +366,7 @@ function setupFormLogic(form) {
                 alert('Error: ' + result.error);
             }
         })
-        .catch(error => alert('Network error. Check console.'))
+        .catch(error => alert('Network error. Check Your Connection.'))
         .finally(() => {
             submitBtn.innerHTML = originalBtnText;
             submitBtn.disabled = false;
@@ -460,26 +403,31 @@ function populateForm(form, record) {
 }
 
 // Helper: Format any date string to YYYY-MM-DD for HTML date inputs
-// Uses LOCAL time to correctly handle IST (UTC+5:30) and other timezones
+// CRITICAL: This function must NEVER shift dates by timezone!
 function formatDateForInput(dateStr) {
     if (!dateStr) return '';
     
     const str = String(dateStr).trim();
 
-    // 1. Already a plain date like "2026-09-10" -> return as-is
+    // 1. Already in YYYY-MM-DD format (e.g., "2026-09-10")
     if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-        return str;
+        return str; // Return as-is. No timezone conversion.
     }
 
-    // 2. ISO format with timezone like "2026-09-09T18:30:00.000Z"
-    //    Convert through Date object and use LOCAL time methods
-    //    (This is the fix for the "one day earlier" bug)
+    // 2. Format YYYY-MM-DDTHH:mm:ss (ISO). Just extract the date portion.
+    //    Example: "2026-09-10T18:30:00.000Z" -> "2026-09-10"
+    if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
+        return str.split('T')[0]; // Take only the date part
+    }
+
+    // 3. Fallback: Try to parse. This should only be for weird formats.
     const d = new Date(str);
     if (isNaN(d.getTime())) return '';
     
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    // Use UTC methods to avoid any local timezone shifts
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 }
 
