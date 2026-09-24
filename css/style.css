@@ -73,4 +73,17 @@ h2, h3 {
 .btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+} 
+
+
+/* Ensure submit button is always clickable and on top */
+#submitBtn, #clearBtn {
+    position: relative;
+    z-index: 100;
+    cursor: pointer;
+}
+
+/* Ensure the loading overlay never blocks clicks when hidden */
+#formLoadingOverlay[style*="display: none"] {
+    pointer-events: none;
 }

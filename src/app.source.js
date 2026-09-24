@@ -332,59 +332,62 @@ function setupFormLogic(form) {
         hiddenInput.value = editId;
         form.appendChild(hiddenInput);
 
-        // ✨ SHOW THE OVERLAY (using inline style to avoid class conflict)
-        overlay.style.display = 'flex';
+        // ✨ SHOW THE LOADING OVERLAY
+        overlay.classList.remove('d-none');
 
+        // After 4 seconds, show the "Cancel" button in case of slow network
         const cancelTimer = setTimeout(() => {
             cancelBtn.classList.remove('d-none');
-        }, 4000);
+        }, 10000);
 
+        // Cancel button action
         cancelBtn.addEventListener('click', () => {
-            window.location.href = '/index';
+            window.location.href = '/form';
         });
 
         // Helper: Hide overlay and populate form
-        let finished = false; // Guard so it only runs once
         const finishLoading = (record) => {
-            if (finished) return;
-            finished = true;
-
             if (record) populateForm(form, record);
             clearTimeout(cancelTimer);
-            
             // Smooth fade out
             overlay.style.transition = 'opacity 0.3s ease';
             overlay.style.opacity = '0';
             setTimeout(() => {
-                overlay.style.display = 'none';
+                overlay.classList.add('d-none');
                 overlay.style.opacity = '1'; // Reset for next time
             }, 300);
         };
 
-        // STRATEGY 1: Show instantly from cache
+        // STRATEGY 1: Check sessionStorage cache first (INSTANT!)
         const cached = getFromCache();
         if (cached) {
             const record = cached.find(r => String(r['Reference Number/Ticket Number']) === String(editId));
             if (record) {
+                // Keep overlay up for at least 300ms for a smooth experience
                 setTimeout(() => finishLoading(record), 300);
             }
         }
 
-        // STRATEGY 2: Fetch fresh data as backup
+        // STRATEGY 2: Also fetch fresh data (in case cache is stale)
         fetchWithRetry(scriptURL + "?action=get", {}, 3, 500)
             .then(data => {
                 const record = data.find(r => String(r['Reference Number/Ticket Number']) === String(editId));
                 if (record) {
+                    // Save to cache for next time
                     saveToCache(data);
-                    finishLoading(record); // Guard prevents double-run
-                } else if (!finished) {
+                    // Only finish if not already finished (cache may have hit first)
+                    if (!overlay.classList.contains('d-none')) {
+                        finishLoading(record);
+                    }
+                } else {
                     alert("Record not found in database!");
                     window.location.href = '/index';
                 }
             })
             .catch(err => {
                 console.error("Error fetching record for edit:", err);
-                if (!finished) {
+                // If we already loaded from cache, don't show an error
+                if (!overlay.classList.contains('d-none')) {
                     alert("Failed to load record. Please try again.");
                     window.location.href = '/index';
                 }
@@ -393,8 +396,6 @@ function setupFormLogic(form) {
         refNumberInput.value = "";
         refNumberInput.placeholder = "Auto-generated on save";
     }
-
-    // ... rest of the form submit logic stays the same
 
     form.addEventListener('submit', e => {
         e.preventDefault();
