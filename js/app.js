@@ -332,62 +332,59 @@ function setupFormLogic(form) {
         hiddenInput.value = editId;
         form.appendChild(hiddenInput);
 
-        // ✨ SHOW THE LOADING OVERLAY
-        overlay.classList.remove('d-none');
+        // ✨ SHOW THE OVERLAY (using inline style to avoid class conflict)
+        overlay.style.display = 'flex';
 
-        // After 4 seconds, show the "Cancel" button in case of slow network
         const cancelTimer = setTimeout(() => {
             cancelBtn.classList.remove('d-none');
-        }, 10000);
+        }, 4000);
 
-        // Cancel button action
         cancelBtn.addEventListener('click', () => {
-            window.location.href = '/form';
+            window.location.href = '/index';
         });
 
         // Helper: Hide overlay and populate form
+        let finished = false; // Guard so it only runs once
         const finishLoading = (record) => {
+            if (finished) return;
+            finished = true;
+
             if (record) populateForm(form, record);
             clearTimeout(cancelTimer);
+            
             // Smooth fade out
             overlay.style.transition = 'opacity 0.3s ease';
             overlay.style.opacity = '0';
             setTimeout(() => {
-                overlay.classList.add('d-none');
+                overlay.style.display = 'none';
                 overlay.style.opacity = '1'; // Reset for next time
             }, 300);
         };
 
-        // STRATEGY 1: Check sessionStorage cache first (INSTANT!)
+        // STRATEGY 1: Show instantly from cache
         const cached = getFromCache();
         if (cached) {
             const record = cached.find(r => String(r['Reference Number/Ticket Number']) === String(editId));
             if (record) {
-                // Keep overlay up for at least 300ms for a smooth experience
                 setTimeout(() => finishLoading(record), 300);
             }
         }
 
-        // STRATEGY 2: Also fetch fresh data (in case cache is stale)
+        // STRATEGY 2: Fetch fresh data as backup
         fetchWithRetry(scriptURL + "?action=get", {}, 3, 500)
             .then(data => {
                 const record = data.find(r => String(r['Reference Number/Ticket Number']) === String(editId));
                 if (record) {
-                    // Save to cache for next time
                     saveToCache(data);
-                    // Only finish if not already finished (cache may have hit first)
-                    if (!overlay.classList.contains('d-none')) {
-                        finishLoading(record);
-                    }
-                } else {
+                    finishLoading(record); // Guard prevents double-run
+                } else if (!finished) {
                     alert("Record not found in database!");
                     window.location.href = '/index';
                 }
             })
             .catch(err => {
                 console.error("Error fetching record for edit:", err);
-                // If we already loaded from cache, don't show an error
-                if (!overlay.classList.contains('d-none')) {
+                if (!finished) {
                     alert("Failed to load record. Please try again.");
                     window.location.href = '/index';
                 }
@@ -397,11 +394,13 @@ function setupFormLogic(form) {
         refNumberInput.placeholder = "Auto-generated on save";
     }
 
+    // ... rest of the form submit logic stays the same
+
     form.addEventListener('submit', e => {
         e.preventDefault();
         const originalBtnText = submitBtn.innerHTML;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Saving...';
-        // submitBtn.disabled = true;
+        submitBtn.disabled = true;
 
         const formData = new FormData(form);
         const urlEncodedData = new URLSearchParams(formData);
@@ -423,7 +422,7 @@ function setupFormLogic(form) {
                 alert('Error: ' + result.error);
             }
         })
-        .catch(error => alert('Network error. Check Your Connection.'))
+        .catch(error => alert('Network error. Check console.'))
         .finally(() => {
             submitBtn.innerHTML = originalBtnText;
             submitBtn.disabled = false;
