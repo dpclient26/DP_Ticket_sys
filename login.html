@@ -80,6 +80,7 @@
                 errorAlert.classList.remove('d-none');
             }
         }
+
         // 1. Generate Math CAPTCHA
         let correctAnswer = 0;
         function generateCaptcha() {
@@ -88,7 +89,7 @@
             correctAnswer = num1 + num2;
             document.getElementById('captchaQuestion').innerText = `What is ${num1} + ${num2}?`;
         }
-        generateCaptcha(); // Run on page load
+        generateCaptcha();
 
         // 2. Handle Login Form Submission
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
@@ -103,8 +104,9 @@
             // Validate CAPTCHA first
             if (captchaInput !== correctAnswer) {
                 errorAlert.innerText = "Incorrect CAPTCHA answer. Please try again.";
+                errorAlert.className = 'alert alert-danger small';
                 errorAlert.classList.remove('d-none');
-                generateCaptcha(); // Generate new captcha
+                generateCaptcha();
                 document.getElementById('captchaAnswer').value = '';
                 return;
             }
@@ -115,7 +117,6 @@
             errorAlert.classList.add('d-none');
 
             try {
-                // Send credentials to Vercel Serverless Function
                 const response = await fetch('/api/auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -124,15 +125,17 @@
 
                 const data = await response.json();
 
-                if (data.success) {
-                    // Store token in SessionStorage to keep user logged in
-                    sessionStorage.setItem('ops_portal_token', data.token);
+                // ✅ FIXED: Apps Script returns "result", not "success"
+                if (data.result === 'success') {
+                    // ✅ FIXED: Store the USERNAME under the key that auth.js expects
+                    sessionStorage.setItem('ops_portal_user', data.username);
                     window.location.href = '/index';
                 } else {
                     throw new Error(data.error || 'Login failed');
                 }
             } catch (error) {
                 errorAlert.innerText = error.message;
+                errorAlert.className = 'alert alert-danger small';
                 errorAlert.classList.remove('d-none');
                 generateCaptcha();
                 document.getElementById('captchaAnswer').value = '';
